@@ -1,4 +1,15 @@
-dataGEN <- function(n, p, ecc, SNRdB) {
+#' Data Generation
+#'
+#' @param n
+#' @param p
+#' @param ecc
+#' @param SNRdB
+#'
+#' @return
+#' @export
+#'
+#' @examples
+dataGEN <- function(n, p, ecc, SNRdB, model) {
   # dataGEN function
   # This function is to generate orthogonal y and e
   #
@@ -32,7 +43,22 @@ dataGEN <- function(n, p, ecc, SNRdB) {
   m[1,1] <- Ey2
   m[2:(p + 1), 2:(p + 1)] <- EeeT
 
-  ye <- matrix(rnorm(n * (p + 1)), n, p + 1) # [y, e]
+  if(model=="rand"){
+    ye <- matrix(rnorm(n * (p + 1)), n, p + 1) # [y, e]
+
+  } else if(model=="sine") {
+    fs = 50
+    dt = 1/fs
+    t = seq(0, dt*(n-1), by=dt)
+    y = 1.0*sin(2*pi*t+rnorm(1,1))
+
+    e =  matrix(rnorm(n * p), n, p)
+    ye = cbind(y, e)
+  } else {
+    message('No such model!')
+  }
+
+
   ye <- scale(ye, center = TRUE)
   ye <- ye %*% chol(cov(ye))  # scale by the Cholesky factor of the covariance matrix
   ye <- ye %*% chol(m)  # scale by the Cholesky factor of m

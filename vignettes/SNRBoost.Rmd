@@ -1,0 +1,157 @@
+---
+title: "SNRBoost"
+output: 
+  bookdown::html_vignette2:
+    toc: true
+    highlight: tango
+    number_sections: false
+vignette: >
+  %\VignetteIndexEntry{SNRBoost}
+  %\VignetteEncoding{UTF-8}
+  %\VignetteEngine{knitr::rmarkdown}
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(SNRBoost)
+library(ggplot2)
+```
+
+# Data Generation
+
+Two data generation model to test the merging methods: 
+- Gaussian white nosie 
+- sinewave 
+
+```{r dat, fig.height=7, fig.width=9}
+# Random seed
+set.seed(4)
+
+### Step 1: Data parameters
+p <- 3 # number of datasets
+n <- 1000 # data length
+
+######## scaling factor (a)##########
+a <- matrix(runif(p), ncol=1) # non-1-vector (for test)
+
+
+ecc <- 0.3 # error cross-correlation [0,1]
+SNRdB <- 0.1 # SNR in dB
+
+### Step 2: Synthetic data generation
+# Signal and error: y and e
+generated_data <- dataGEN(n, p, ecc, SNRdB, model="sine")
+y <- generated_data$y
+e <- generated_data$e
+y <- matrix(y, ncol=1)
+
+# Observation: x = a*signal + error
+x <- y %*% t(a) + e
+
+plot.ts(cbind(y,x))
+```
+
+## Statistics of raw dataset
+
+```{r stat}
+# Signal power and covariance matrices of e and x
+Ey2 <- var(y[,1]); sum(y^2)/(n-1)
+Ey2 <- sum(y^2)/(n)
+EeeT <- cov(e)
+ExxT <- cov(x)
+N <- EeeT / Ey2 # error-to-signal ratio
+N
+
+# Functions of MSE and R2 by linear combination using u
+MSE_func <- function(u) apply(t(u) %*% ExxT %*% u, 2, function(col) col - (2 * Ey2 * t(u) %*% a)) + Ey2
+R2_func <- function(u) Ey2 * (t(u) %*% a %*% t(a) %*% u) / (t(u) %*% ExxT %*% u)
+
+# RMSE of observations
+MSE_ori <- sapply(1:p, function(i) mean((y-x[,i])^2))
+
+# Pearson correlation of observations
+R2_ori <- cor(y,x)
+
+# Printing metrics
+cat("+ Metrics for original data\n")
+cat(" * MSE for x:", round(MSE_ori, 3), "\n")
+cat(" * R2 for x:", round(R2_ori, 3), "\n")
+```
+
+## Spectral analysis
+
+```{r spec}
+spc.method <- switch(1, "pgram", "ar")
+spc.kernel <- kernel("fejer", 100, r=6)
+spectrum_df <- function(data, span=2, log="no", kernel=spc.kernel, method=spc.method) {
+  spec <- spectrum(data, span=span, log=log, kernel=kernel, method=method, plot=F)
+  
+  # Create a dataframe with frequency and spectral density
+  delta<- 1/50 # sampling interval = time sequence
+  data.frame(Frequency = spec$freq/delta, SpectralDensity = 2*spec$spec)
+}
+
+y_spec <- spectrum_df(y)
+
+#spectrum(x[,2],log="no",span=2, kernel=spc.kernel,method=spc.method,plot=T)
+
+x_spec <- NULL
+for(i in 1:p){
+  
+  tmp <- spectrum_df(x[,i], span=2)
+    
+  x_spec <- rbind(x_spec, data.frame(Group=factor(i), tmp))
+}
+summary(x_spec)
+
+# Calculate significance level (95% significance level for white noise)
+n <- length(y)
+alpha <- 0.05
+significance_level <- qchisq(1 - alpha, df = 2) / 2 / n
+
+# Plot using ggplot2 for better aesthetics
+ggplot(x_spec, aes(x=Frequency, y=SpectralDensity, color=Group)) +
+  geom_line(size=1.2) +
+  
+  geom_line(data=y_spec, aes(x=Frequency, y=SpectralDensity), size=0.5, color="black") +
+  
+  geom_hline(yintercept = significance_level, linetype = "dashed", color = "red") +
+  annotate("text", x = max(x_spec$Frequency) * 0.9, y = significance_level, 
+           label = paste0("95% Significance: ", round(significance_level, 4)), 
+           vjust = -0.5, hjust = 1, color = "red") +
+  scale_y_continuous() + # Log scale if specified
+
+  labs(x = "Frequency",
+       y = "Spectral Density",
+       color = "Data Series") +
+  theme_bw() +
+  theme(text = element_text(size = 20, family="serif", face="bold"),
+        plot.margin = unit(c(0.5,0.1,0.1, 0.1), "cm"),
+        panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank(),
+
+        #axis.text.x = element_text(angle = 45, vjust=1, hjust=1),
+
+        strip.background = element_blank(),
+        strip.placement = "outside",
+
+        #legend.position = c(0.85,0.9),
+        legend.position = "right",
+        legend.title=element_blank(),
+        legend.key.width = unit(1,"cm"))
+
+
+```
+
+
+
+
+
