@@ -50,7 +50,7 @@ dataGEN <- function(n, p, ecc, SNRdB, model) {
     fs = 50
     dt = 1/fs
     t = seq(0, dt*(n-1), by=dt)
-    y = 1.0*sin(2*pi*t+rnorm(1,1))
+    y = 1.0*sin(2*pi*t+runif(1,0,2*pi))
 
     e =  matrix(rnorm(n * p), n, p)
     ye = cbind(y, e)
@@ -85,6 +85,15 @@ WA <- function(EeeT) {
 }
 
 
+#' SNR optimization
+#'
+#' @param N
+#' @param a
+#'
+#' @return
+#' @export
+#'
+#' @examples
 SNRopt <- function(N, a) {
   # SNRopt function
   # This function is to estimate weight for SNRopt
@@ -95,6 +104,7 @@ SNRopt <- function(N, a) {
   #
   # OUTPUT
   #   u = merging weight (px1)
+
   lambda <- 1e-16
   #lambda <- 0
   matrix_regularized <- N + a %*% t(a) + lambda * diag(nrow(N))

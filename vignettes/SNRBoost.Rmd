@@ -23,6 +23,11 @@ knitr::opts_chunk$set(
 ```{r setup}
 library(SNRBoost)
 library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(scales)
+require(viridis)
+col_qual <- RColorBrewer::brewer.pal(n=3, name="Dark2")
 ```
 
 # Data Generation
@@ -33,28 +38,43 @@ Two data generation model to test the merging methods:
 
 ```{r dat, fig.height=7, fig.width=9}
 # Random seed
-set.seed(4)
+set.seed(20240924)
 
 ### Step 1: Data parameters
 p <- 3 # number of datasets
-n <- 1000 # data length
-
-######## scaling factor (a)##########
-a <- matrix(runif(p), ncol=1) # non-1-vector (for test)
-
+n <- 300 # data length
 
 ecc <- 0.3 # error cross-correlation [0,1]
 SNRdB <- 0.1 # SNR in dB
 
 ### Step 2: Synthetic data generation
 # Signal and error: y and e
-generated_data <- dataGEN(n, p, ecc, SNRdB, model="sine")
-y <- generated_data$y
-e <- generated_data$e
-y <- matrix(y, ncol=1)
-
-# Observation: x = a*signal + error
-x <- y %*% t(a) + e
+n_ensemble <- 100
+df_mat <- vector('list', n_ensemble)
+for(i_r in 1:n_ensemble){
+  ######## scaling factor (a)##########
+  a <- matrix(rep(1, p), ncol=1)  # 1-vector
+  #a <- matrix(runif(p), ncol=1) # non-1-vector (for test)
+  generated_data <- dataGEN(n, p, ecc, SNRdB, model="sine")
+  y <- generated_data$y %>% matrix(ncol=1)
+  e <- generated_data$e
+  
+  # Observation: x = a*signal + error
+  x <- y %*% t(a) + e
+  
+  # Signal power and covariance matrices of e and x
+  Ey2 <- var(y[,1]); sum(y^2)/(n-1)
+  #Ey2 <- sum(y^2)/(n)
+  EeeT <- cov(e)
+  ExxT <- cov(x)
+  N <- EeeT / Ey2 # error-to-signal ratio
+  N
+  
+  df_mat[[i_r]]$y <- y
+  df_mat[[i_r]]$x <- x
+  df_mat[[i_r]]$N <- N
+  df_mat[[i_r]]$a <- a
+}
 
 plot.ts(cbind(y,x))
 ```
@@ -62,19 +82,7 @@ plot.ts(cbind(y,x))
 ## Statistics of raw dataset
 
 ```{r stat}
-# Signal power and covariance matrices of e and x
-Ey2 <- var(y[,1]); sum(y^2)/(n-1)
-Ey2 <- sum(y^2)/(n)
-EeeT <- cov(e)
-ExxT <- cov(x)
-N <- EeeT / Ey2 # error-to-signal ratio
-N
-
-# Functions of MSE and R2 by linear combination using u
-MSE_func <- function(u) apply(t(u) %*% ExxT %*% u, 2, function(col) col - (2 * Ey2 * t(u) %*% a)) + Ey2
-R2_func <- function(u) Ey2 * (t(u) %*% a %*% t(a) %*% u) / (t(u) %*% ExxT %*% u)
-
-# RMSE of observations
+# MSE of observations
 MSE_ori <- sapply(1:p, function(i) mean((y-x[,i])^2))
 
 # Pearson correlation of observations
@@ -86,55 +94,92 @@ cat(" * MSE for x:", round(MSE_ori, 3), "\n")
 cat(" * R2 for x:", round(R2_ori, 3), "\n")
 ```
 
-## Spectral analysis
+## Data overview
 
-```{r spec}
-spc.method <- switch(1, "pgram", "ar")
+```{r fig}
+spc.method <- switch(2, "pgram", "ar")
 spc.kernel <- kernel("fejer", 100, r=6)
+
 spectrum_df <- function(data, span=2, log="no", kernel=spc.kernel, method=spc.method) {
   spec <- spectrum(data, span=span, log=log, kernel=kernel, method=method, plot=F)
   
   # Create a dataframe with frequency and spectral density
-  delta<- 1/50 # sampling interval = time sequence
-  data.frame(Frequency = spec$freq/delta, SpectralDensity = 2*spec$spec)
+  delta<- 1 # sampling interval = time sequence
+  spec_df <- data.frame(Frequency = spec$freq/delta, SpectralDensity = 2*spec$spec)
+  
+  return(spec_df)
 }
 
-y_spec <- spectrum_df(y)
+df_raw <- data.frame(No=1:n, x, y) %>% gather(Group, value, 2:5)
+summary(df_raw)
 
-#spectrum(x[,2],log="no",span=2, kernel=spc.kernel,method=spc.method,plot=T)
+my_labeller <- as_labeller(c(X1="x[1]",
+                             X2="x[2]",
+                             X3="x[3]",
+                             y="y [Truth]"), 
+							 default = label_parsed)
 
-x_spec <- NULL
-for(i in 1:p){
+fig <- ggplot(df_raw) + 
+  geom_line(aes(x=No, y=value, color=Group),linewidth=0.5) + 
+
+  facet_wrap(Group~., strip.position="left", ncol = 1, labeller = my_labeller) + 
   
-  tmp <- spectrum_df(x[,i], span=2)
-    
-  x_spec <- rbind(x_spec, data.frame(Group=factor(i), tmp))
-}
-summary(x_spec)
-
-# Calculate significance level (95% significance level for white noise)
-n <- length(y)
-alpha <- 0.05
-significance_level <- qchisq(1 - alpha, df = 2) / 2 / n
-
-# Plot using ggplot2 for better aesthetics
-ggplot(x_spec, aes(x=Frequency, y=SpectralDensity, color=Group)) +
-  geom_line(size=1.2) +
+  scale_color_manual(values=c(viridis(4)[-4],"black")) + 
+  labs(x=NULL, y=NULL) + 
   
-  geom_line(data=y_spec, aes(x=Frequency, y=SpectralDensity), size=0.5, color="black") +
-  
-  geom_hline(yintercept = significance_level, linetype = "dashed", color = "red") +
-  annotate("text", x = max(x_spec$Frequency) * 0.9, y = significance_level, 
-           label = paste0("95% Significance: ", round(significance_level, 4)), 
-           vjust = -0.5, hjust = 1, color = "red") +
-  scale_y_continuous() + # Log scale if specified
-
-  labs(x = "Frequency",
-       y = "Spectral Density",
-       color = "Data Series") +
   theme_bw() +
   theme(text = element_text(size = 20, family="serif", face="bold"),
         plot.margin = unit(c(0.5,0.1,0.1, 0.1), "cm"),
+        panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.border = element_blank(), 
+        
+        panel.spacing = unit(0, "lines"), 
+        strip.background = element_blank(), 
+        strip.text.y.left = element_text(angle = 0), 
+
+        axis.text.x = element_blank(), 
+        axis.ticks.x = element_blank(), 
+        axis.text.y = element_blank(), 
+        axis.ticks.y = element_blank(), 
+
+        legend.position = "none",
+        legend.title=element_blank(),
+        legend.key.width = unit(1,"cm"))
+
+fig
+
+```
+
+## Spectram analysis
+
+```{r fig1}
+y_spec <- spectrum_df(y)
+x_spec <- sapply(1:p, function(i) spectrum_df(x[,i], span=1)$Spec)
+
+df_spec <- data.frame(Freq=y_spec$Frequency, 
+                        y=y_spec$SpectralDensity, 
+                        x_spec) %>% 
+  gather(Group,Spec,2:5)
+
+df_spec$Group <- factor(df_spec$Group)
+summary(df_spec)
+
+fig1 <- ggplot(df_spec) +
+
+  geom_line(aes(Freq, Spec, color=Group),linewidth=1) +
+
+  scale_y_log10("Spectrum", limits=c(10e-5,10e3),
+                breaks = trans_breaks("log10", function(x) 10^x),
+                labels = trans_format("log10", math_format(10^.x))) +
+
+  scale_color_manual(values=c(viridis(4)[-4],"black"), labels=expression(x[1],x[2],x[3],y[Truth])) + 
+  labs(x="Frequency", y=NULL) +
+  guides(color = guide_legend(byrow = TRUE, ncol=1)) + 
+  
+  theme_bw() +
+  theme(text = element_text(size = 16, family="serif", face="bold"),
+        plot.margin = unit(c(0.5,0.5,0.1, 0.5), "cm"),
         panel.grid.minor = element_blank(),
         panel.grid.major = element_blank(),
 
@@ -143,15 +188,166 @@ ggplot(x_spec, aes(x=Frequency, y=SpectralDensity, color=Group)) +
         strip.background = element_blank(),
         strip.placement = "outside",
 
-        #legend.position = c(0.85,0.9),
-        legend.position = "right",
+        legend.position = c(0.8,0.8),
+        legend.key.spacing.y = unit(0, 'mm'), 
+        legend.background = element_rect(fill="transparent"),
+        #legend.position = "right",
         legend.title=element_blank(),
-        legend.key.width = unit(1,"cm"))
+        legend.key.width = unit(1,"cm")) 
 
+fig1
+
+```
+
+# SNR optimaztion 
+```{r snr}
+## Merging using true parameters
+us <- SNRopt(N, a) # SNR-opt
+
+y_snr <- x%*%us
+
+cor(y,y_snr)
+
+y_snr_ls <- sapply(1:n_ensemble, function(i) df_mat[[i]]$x%*%SNRopt(df_mat[[i]]$N,df_mat[[i]]$a))
 
 ```
 
 
+# Frequency based SNR optimization
 
+It is equivalent to MISO Wiener filtering
+
+```{r freq-snr}
+wf <- "d4"
+if(wf!="haar") v <- as.integer(parse_number(wf)/2) else v <- 1
+J <- floor(log2(n/2)) - 1
+J <- 6
+mode <- 'DWT'; pad="zero"; boundary="periodic"
+
+SNR_freq <- SNRopt_freq(y, x, mode, wf, J, pad, boundary, option="Truth")
+
+summary(SNR_freq)
+
+y_snr_freq <- rowSums(SNR_freq$merged_WT)
+cor(y,y_snr_freq)
+
+
+y_snr_freq_ls <- sapply(1:n_ensemble, function(i) SNRopt_freq(df_mat[[i]]$y,df_mat[[i]]$x, mode, wf, J, pad, boundary, option="Truth")$merged)
+
+```
+
+# Merged products
+
+```{r merge}
+
+df_y <- data.frame(No=1:n, y, y_snr,y_snr_freq) %>% gather(Group, value,2:4)
+summary(df_y)
+
+my_labeller <- as_labeller(c(y="y [Truth]", 
+                             y_snr="y [SNR]", 
+                             y_snr_freq="y [SNR(w)]"), 
+							 default = label_parsed)
+
+fig2 <- ggplot(df_y) + 
+  geom_line(aes(x=No, y=value, color=Group), linewidth=1) + 
+
+  facet_wrap(Group~., strip.position="left", ncol = 1, scale="fixed", labeller = my_labeller) + 
+  labs(x=NULL, y=NULL) + 
+  #scale_color_manual(values=col_qual) + 
+  scale_color_manual(values=c("black","red","blue")) + 
+  
+  theme_bw() +
+  theme(text = element_text(size = 20, family="serif", face="bold"),
+        plot.margin = unit(c(0.5,0.1,0.1, 0.1), "cm"),
+        panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.border = element_blank(), 
+        
+        panel.spacing = unit(1, "lines"), 
+        strip.placement = "outside", 
+        strip.background = element_blank(), 
+        strip.text.y.left = element_text(angle = 0), 
+
+        #axis.title.x = element_text(angle = 0), 
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+
+        legend.position = "none",
+        legend.title=element_blank(),
+        legend.key.width = unit(1,"cm"))
+
+fig2
+
+```
+
+
+# Spectrum comparsion
+
+```{r}
+
+y_spec1_r <- sapply(1:n_ensemble, function(i) spectrum_df(df_mat[[i]]$y)$Spect) %>% rowMeans()
+
+y_spec2_r <- sapply(1:n_ensemble, function(i) spectrum_df(y_snr_ls[,i])$Spect) %>% rowMeans()
+
+y_spec3_r <- sapply(1:n_ensemble, function(i) spectrum_df(y_snr_freq_ls[,i])$Spect) %>% rowMeans()
+
+
+df_y_spec1 <- data.frame(Freq=y_spec$Frequency, 
+                        Spec=y_spec1_r, 
+                        Spec_snr=y_spec2_r,
+                        Spec_snr_freq=y_spec3_r) %>% 
+  gather(Group,Spec,2:4)
+summary(df_y_spec)
+
+fig3 <- ggplot(df_y_spec1) +
+
+  geom_line(aes(Freq, Spec, color=Group),linewidth=1) +
+
+  scale_y_log10("Spectrum", limits=c(10e-5,10e3),
+                breaks = trans_breaks("log10", function(x) 10^x),
+                labels = trans_format("log10", math_format(10^.x))) +
+
+  labs(x="Frequency", y=NULL) +
+  scale_color_manual(values=c("black","red","blue"), labels=expression(y[Truth],y[SNR],y[SNR(w)])) + 
+
+  theme_bw() +
+  theme(text = element_text(size = 16, family="serif", face="bold"),
+        plot.margin = unit(c(0.5,0.5,0.1, 0.5), "cm"),
+        panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank(),
+
+        #axis.text.x = element_text(angle = 45, vjust=1, hjust=1),
+
+        strip.background = element_blank(),
+        strip.placement = "outside",
+
+        legend.position = c(0.8,0.8),
+        legend.key.spacing.y = unit(0.1, 'cm'), 
+        legend.background = element_rect(fill="transparent"),
+        #legend.position = "right",
+        legend.title=element_blank(),
+        legend.key.width = unit(1,"cm"))
+
+fig3
+```
+
+
+# Figure out
+```{r}
+
+plt <- cowplot::plot_grid(fig,fig1,fig2,fig3, ncol=2, labels=LETTERS, 
+						               label_size=12,
+                           label_fontfamily = "serif",
+                           label_fontface = "bold",
+                           label_colour = "black")
+
+
+plt
+
+## save plot 
+ggsave(paste0("Figure1.jpg"), plt, width = 9, height = 7,  dpi=500)
+```
 
 
