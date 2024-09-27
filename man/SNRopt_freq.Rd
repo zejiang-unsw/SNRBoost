@@ -5,7 +5,7 @@
 \title{SNRopt_freq}
 \usage{
 SNRopt_freq(
-  y,
+  y = NULL,
   x,
   mode = "DWT",
   wf = "haar",

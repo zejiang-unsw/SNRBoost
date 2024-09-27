@@ -2,6 +2,7 @@
 
 export(SNRopt)
 export(SNRopt_freq)
+export(WA)
 export(dataGEN)
 export(maxR)
 export(snr)
