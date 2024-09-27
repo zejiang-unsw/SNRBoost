@@ -1,9 +1,9 @@
-#rm(list = ls())
-graphics.off()
+rm(list = ls())
+#graphics.off()
 
 
 # Random seed
-set.seed(4)
+set.seed(101)
 
 ### Step 1: Data parameters
 p <- 3 # number of datasets
@@ -18,7 +18,8 @@ SNRdB <- 0.1 # SNR in dB
 
 ### Step 2: Synthetic data generation
 # Signal and error: y and e
-generated_data <- dataGEN(n, p, ecc, SNRdB)
+model <- switch(2, "rand", "sine")
+generated_data <- dataGEN(n, p, ecc, SNRdB, model)
 y <- generated_data$y
 e <- generated_data$e
 y <- matrix(y, ncol=1)
@@ -55,27 +56,26 @@ ye <- x%*%ue
 yw <- x%*%uw_est
 ys <- x%*%us_est
 
-sum(uw_est) %>% print()
-sum(us_est) %>% print()
-
 wf <- "haar"
 boundary <- "periodic"
 if(wf!="haar") v <- as.integer(parse_number(wf)/2) else v <- 1
 J <- floor(log(n/(2*v-1))/log(2))-1 #(Kaiser, 1994)
 J %>% print()
-out <- SNRopt_wav(x, mode="DWT", wf=wf, J=J, boundary=boundary, theta=1)
+out <- SNRopt_freq(x=x, mode="DWT", wf=wf, J=J, boundary=boundary, theta = 0.1)
 us_est_WT <- out$weight
-y_est_WT <- out$merged
-
-yn <- rowMeans(y_est_WT[,1:J-1])
+yn <- out$merged
 
 # RMSE of data merged by estimated parameters
-y_m <- cbind(ye,yw,ys, yn)
+y_m <- cbind(y,ye,yw,ys,yn)
+
+plot.ts(y_m)
+
+# metrics----
 MSE_est <- sapply(1:4, function(i) mean((y-y_m[,i])^2))
 MSE_est %>% print()
 
 # Pearson correlation of data merged by estimated parameters
-R_est <- cor(y, y_m)
+R_est <- cor(y,y_m)
 R_est %>% print()
 
 

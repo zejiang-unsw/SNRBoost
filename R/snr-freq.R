@@ -14,7 +14,7 @@
 #' @import readr
 #'
 #' @examples
-SNRopt_freq <- function(y, x, mode="DWT", wf="haar", J, pad="zero", boundary="periodic", theta=0.1,
+SNRopt_freq <- function(y=NULL, x, mode="DWT", wf="haar", J, pad="zero", boundary="periodic", theta=0.1,
                         option="Est") {
 
   n <- nrow(x)
@@ -39,6 +39,7 @@ SNRopt_freq <- function(y, x, mode="DWT", wf="haar", J, pad="zero", boundary="pe
 
   }
 
+  if(option=="Truth"){
   if(mode=="DWT"){
     y1 <- padding(y, pad = pad)
     tmp <- mra(y1, wf=wf, J=J, method="modwt", boundary=boundary)
@@ -47,6 +48,7 @@ SNRopt_freq <- function(y, x, mode="DWT", wf="haar", J, pad="zero", boundary="pe
     tmp <- modwt(y, wf=wf, n.levels = J, boundary = boundary)
     #summary(tmp) %>% print()
     y_WT <- matrix(unlist(tmp), ncol = J + 1, byrow = FALSE)
+  }
   }
 
   # weight estimation
@@ -70,14 +72,14 @@ SNRopt_freq <- function(y, x, mode="DWT", wf="haar", J, pad="zero", boundary="pe
     } else if(option=="Est") {
       #Ey2_wT = var(rowMeans(x_WT))*theta
       #Ey2_wT = max(apply(x_WT, 2, var))*theta
-      Ey2_wT = max(colMeans(x_WT^2))*theta
+      Ey2_wT = max(colMeans(x_WT^2))*theta # best estimate from best observation
       ExxT_WT = cov(x_WT)
 
       SNRest_WT <- SNRest(ExxT_WT, Ey2_wT)
 
       N_WT <- SNRest_WT$N_est
       a_WT <- SNRest_WT$a_est
-      #a_WT <- rep(1, p) # best estimation
+      a_WT <- rep(1, p) # best estimation
     } else {
       message("No such mode!")
     }

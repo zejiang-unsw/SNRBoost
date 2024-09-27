@@ -70,6 +70,14 @@ dataGEN <- function(n, p, ecc, SNRdB, model) {
 }
 
 
+#' Weighted Average function
+#'
+#' @param EeeT
+#'
+#' @return
+#' @export
+#'
+#' @examples
 WA <- function(EeeT) {
   # WA function
   # This function is to estimate weight for Weighted Average
@@ -79,6 +87,7 @@ WA <- function(EeeT) {
   #
   # OUTPUT
   #   u = merging weight (px1)
+
   eta <- matrix(c(rep(1, ncol(EeeT))), ncol = 1)
   u <- as.numeric(solve(t(eta)%*%solve(EeeT)%*%eta))*(solve(EeeT)%*%eta)
   return(u)

@@ -26,6 +26,7 @@ library(ggplot2)
 library(dplyr)
 library(tidyr)
 library(scales)
+library(tidyverse)
 require(viridis)
 col_qual <- RColorBrewer::brewer.pal(n=3, name="Dark2")
 ```
@@ -263,7 +264,7 @@ fig2 <- ggplot(df_y) +
         panel.grid.major = element_blank(),
         panel.border = element_blank(), 
         
-        panel.spacing = unit(1, "lines"), 
+        panel.spacing = unit(0, "lines"), 
         strip.placement = "outside", 
         strip.background = element_blank(), 
         strip.text.y.left = element_text(angle = 0), 
@@ -294,14 +295,14 @@ y_spec2_r <- sapply(1:n_ensemble, function(i) spectrum_df(y_snr_ls[,i])$Spect) %
 y_spec3_r <- sapply(1:n_ensemble, function(i) spectrum_df(y_snr_freq_ls[,i])$Spect) %>% rowMeans()
 
 
-df_y_spec1 <- data.frame(Freq=y_spec$Frequency, 
+df_y_spec <- data.frame(Freq=y_spec$Frequency, 
                         Spec=y_spec1_r, 
                         Spec_snr=y_spec2_r,
                         Spec_snr_freq=y_spec3_r) %>% 
   gather(Group,Spec,2:4)
 summary(df_y_spec)
 
-fig3 <- ggplot(df_y_spec1) +
+fig3 <- ggplot(df_y_spec) +
 
   geom_line(aes(Freq, Spec, color=Group),linewidth=1) +
 
