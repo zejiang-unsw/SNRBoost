@@ -69,6 +69,60 @@ dataGEN <- function(n, p, ecc, SNRdB, model) {
   return(list(y = y, e = e))
 }
 
+#' WA_est
+#'
+#' @param y
+#' @param x
+#'
+#' @return
+#' @export
+#'
+#' @examples
+WA_est <- function(y=NULL,x){
+
+  ExxT <- cov(x)
+
+  ECVest_result <- ECVest(ExxT)
+  EeeT_est <- ECVest_result$EeeT_est
+
+  uw_est <- WA(EeeT_est)
+  y_est <- x %*% uw_est
+
+  out <- list(weight=uw_est,
+              merged=y_est)
+  return(out)
+}
+
+
+#' SNRopt_est
+#'
+#' @param y
+#' @param x
+#'
+#' @return
+#' @export
+#'
+#' @examples
+SNRopt_est <- function(y, x){
+
+  ExxT <- cov(x)
+
+  Ey2 <- var(y)[1]
+  Ey2_est <- Ey2 * 0.5
+
+
+  SNRest_result <- SNRest(ExxT, Ey2_est)
+  N_est <- SNRest_result$N_est
+  a_est <- SNRest_result$a_est
+
+  us_est <- SNRopt(N_est, a_est)
+  y_est <- x %*% us_est
+
+  out <- list(weight=us_est,
+              merged=y_est)
+  return(out)
+
+}
 
 #' Weighted Average function
 #'
@@ -114,8 +168,8 @@ SNRopt <- function(N, a) {
   # OUTPUT
   #   u = merging weight (px1)
 
-  lambda <- 1e-16
-  #lambda <- 0
+  #lambda <- 1e-16
+  lambda <- 0
   matrix_regularized <- N + a %*% t(a) + lambda * diag(nrow(N))
   u <- solve(matrix_regularized)%*%a
 

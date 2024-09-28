@@ -50,16 +50,18 @@ n <- 300 # data length
 ecc <- 0.3 # error cross-correlation [0,1]
 SNRdB <- 0.1 # SNR in dB
 
+model <- switch(2,"rand","sine")
+
 ### Step 2: Synthetic data generation
 # Signal and error: y and e
 n_ensemble <- 100
 df_mat <- vector('list', n_ensemble)
 for(i_r in 1:n_ensemble){
   ######## scaling factor (a)##########
-  a <- matrix(rep(1, p), ncol=1)  # 1-vector
-  #a <- matrix(runif(p), ncol=1) # non-1-vector (for test)
+  #a <- matrix(rep(1, p), ncol=1)  # 1-vector
+  a <- matrix(runif(p), ncol=1) # non-1-vector (for test)
   
-  generated_data <- dataGEN(n, p, ecc, SNRdB, model="sine")
+  generated_data <- dataGEN(n, p, ecc, SNRdB, model=model)
   y <- generated_data$y %>% matrix(ncol=1)
   e <- generated_data$e
   
@@ -127,14 +129,13 @@ my_labeller <- as_labeller(c(X1="x[1]",
 
 df_raw$Group <- factor(df_raw$Group, levels = c("y","X1","X2", "X3"))
 
-col_seq <- RColorBrewer::brewer.pal(n=3, name="Set2")
 
 fig <- ggplot(df_raw) + 
-  geom_line(aes(x=No, y=value, color=Group),linewidth=1) + 
+  geom_line(aes(x=No, y=value, color=Group),linewidth=0.5) + 
 
   facet_wrap(Group~., strip.position="left", ncol = 1, labeller = my_labeller) + 
   
-  scale_color_manual(values=c("black", col_seq)) + 
+  scale_color_manual(values=c("black", col_qual)) + 
   labs(x=NULL, y=NULL) + 
   
   theme_bw() +
@@ -173,17 +174,13 @@ y_eq <- x %*% ue
 y_wa <- x %*% uw
 y_snr <- x%*%us
 
-y_wa - y_wa_ls[,n_ensemble]
-
 plot.ts(cbind(y,y_wa,y_snr))
 
 cor(y,cbind(y_wa, y_snr))
 
-
-
 ```
 
-# Merged products in time domain
+## Merged products in time domain
 
 ```{r merge1}
 
@@ -197,13 +194,13 @@ my_labeller <- as_labeller(c(y="y [Truth]",
 							 default = label_parsed)
 
 df_y$Group <- factor(df_y$Group, levels = c("y","y_eq","y_wa", "y_snr"))
-fig1.c <- ggplot(df_y) + 
-  geom_line(aes(x=No, y=value, color=Group), linewidth=1) + 
+fig1.c <- ggplot(df_y %>% subset(Group!="y")) + 
+  geom_line(aes(x=No, y=value, color=Group), linewidth=0.5) + 
 
   facet_wrap(Group~., strip.position="left", ncol = 1, scale="fixed", labeller = my_labeller) + 
   labs(x=NULL, y=NULL) + 
   #scale_color_manual(values=col_qual) + 
-  scale_color_manual(values=c("black","red","blue","green")) + 
+  scale_color_manual(values=c("red","blue","green")) + 
   
   theme_bw() +
   theme(text = element_text(size = 20, family="serif", face="bold"),
@@ -254,7 +251,7 @@ fig1 <- ggplot(df_spec) +
                 breaks = trans_breaks("log10", function(x) 10^x),
                 labels = trans_format("log10", math_format(10^.x))) +
 
-  scale_color_manual(values=c("black",col_seq), labels=expression(y[Truth],x[1],x[2],x[3])) + 
+  scale_color_manual(values=c("black",col_qual), labels=expression(y[Truth],x[1],x[2],x[3])) + 
   labs(x="Frequency", y=NULL) +
   guides(color = guide_legend(byrow = TRUE, ncol=1)) + 
   
@@ -332,7 +329,7 @@ fig1.d
 ```
 
 
-# Figure 1
+## Figure 1
 ```{r plt1}
 
 plt1 <- cowplot::plot_grid(fig,fig1,fig1.c,fig1.d, ncol=2, labels=LETTERS, 
@@ -345,7 +342,7 @@ plt1 <- cowplot::plot_grid(fig,fig1,fig1.c,fig1.d, ncol=2, labels=LETTERS,
 plt1
 
 ## save plot 
-ggsave(paste0("Figure1.jpg"), plt1, width = 9, height = 7,  dpi=500)
+ggsave(paste0("Figure1_",model,".jpg"), plt1, width = 9, height = 7,  dpi=500)
 ```
 
 # Frequency based SNR optimization
@@ -359,43 +356,53 @@ J <- floor(log2(n/2)) - 1
 J <- 6
 mode <- 'DWT'; pad="zero"; boundary="periodic"
 
-SNR_freq <- SNRopt_freq(y, x, mode, wf, J, pad, boundary, option="Truth")
+y_snr_freq <- SNRopt_freq(y, x, mode, wf, J, pad, boundary, option="Truth")$merged
 
-summary(SNR_freq)
+summary(y_snr_freq)
 
-y_snr_freq <- rowSums(SNR_freq$merged_WT)
-cor(y,y_snr_freq)
+cor(y,cbind(y_eq, y_wa, y_snr, y_snr_freq))
 
+flag.mode <- switch(1, "Truth", "Est")
+if(flag.mode =="Truth"){
 
-y_snr_freq_ls <- sapply(1:n_ensemble, function(i) SNRopt_freq(df_mat[[i]]$y,df_mat[[i]]$x, mode, wf, J, pad, boundary, option="Truth")$merged)
-
-
-y_wa_ls <- sapply(1:n_ensemble, function(i) df_mat[[i]]$x%*%WA(cov(df_mat[[i]]$e)))
-
-y_snr_ls <- sapply(1:n_ensemble, function(i) df_mat[[i]]$x%*%SNRopt(df_mat[[i]]$N,df_mat[[i]]$a))
+  y_wa_ls <- sapply(1:n_ensemble, function(i) df_mat[[i]]$x%*%WA(cov(df_mat[[i]]$e)))
+  
+  y_snr_ls <- sapply(1:n_ensemble, function(i) df_mat[[i]]$x%*%SNRopt(df_mat[[i]]$N,df_mat[[i]]$a))
+  
+  y_snr_freq_ls <- sapply(1:n_ensemble, function(i) SNRopt_freq(df_mat[[i]]$y,df_mat[[i]]$x, mode, wf, J, pad, boundary, option="Truth")$merged)
+} else {
+  y_wa_ls <- sapply(1:n_ensemble, function(i) WA_est(x=df_mat[[i]]$x)$merged)
+  
+  y_snr_ls <- sapply(1:n_ensemble, function(i) SNRopt_est(df_mat[[i]]$y, df_mat[[i]]$x)$merged)
+  
+  y_snr_freq_ls <- sapply(1:n_ensemble, function(i) SNRopt_freq(df_mat[[i]]$y,df_mat[[i]]$x, mode, wf, J, pad, boundary, option="Est", scale_factor = F)$merged)
+}
 
 
 ```
 
-# Merged products in frequency
+## Merged products in frequency
 
 ```{r merge2}
 
-df_y <- data.frame(No=1:n, y, y_snr,y_snr_freq) %>% gather(Group, value,2:4)
+df_y <- data.frame(No=1:n, y, y_wa, y_snr,y_snr_freq) %>% gather(Group, value,2:5)
 summary(df_y)
 
 my_labeller <- as_labeller(c(y="y [Truth]", 
+                             y_wa="y [WA]", 
                              y_snr="y [SNR]", 
                              y_snr_freq="y [SNR(w)]"), 
 							 default = label_parsed)
 
-fig2 <- ggplot(df_y) + 
+df_y$Group <- factor(df_y$Group, levels = c("y","y_wa", "y_snr", "y_snr_freq"))
+
+p2.1 <- ggplot(df_y) + 
   geom_line(aes(x=No, y=value, color=Group), linewidth=1) + 
 
   facet_wrap(Group~., strip.position="left", ncol = 1, scale="fixed", labeller = my_labeller) + 
   labs(x=NULL, y=NULL) + 
   #scale_color_manual(values=col_qual) + 
-  scale_color_manual(values=c("black","red","blue")) + 
+  scale_color_manual(values=c("black","red","blue","green")) + 
   
   theme_bw() +
   theme(text = element_text(size = 20, family="serif", face="bold"),
@@ -419,27 +426,35 @@ fig2 <- ggplot(df_y) +
         legend.title=element_blank(),
         legend.key.width = unit(1,"cm"))
 
-fig2
+p2.1
 
 ```
 
 
-# Spectrum comparsion - merged
+## Spectrum comparsion - merged
 
-```{r}
+```{r spec}
 
+if(FALSE){
 y_spec1_r <- sapply(1:n_ensemble, function(i) spectrum_df(df_mat[[i]]$y)$Spect) %>% rowMeans()
 
 y_wa_r <- sapply(1:n_ensemble, function(i) spectrum_df(y_wa_ls[,i])$Spect) %>% rowMeans()
 
-
 y_spec2_r <- sapply(1:n_ensemble, function(i) spectrum_df(y_snr_ls[,i])$Spect) %>% rowMeans()
 
 y_spec3_r <- sapply(1:n_ensemble, function(i) spectrum_df(y_snr_freq_ls[,i])$Spect) %>% rowMeans()
+} else {
 
+  y_wa_r <- spectrum_df(y_wa, span=1)$Spect
+  
+  y_spec2_r <- spectrum_df(y_snr, span=1)$Spect
+  
+  
+  y_spec3_r <- spectrum_df(y_snr_freq, span=1)$Spect
+}
 
 df_y_spec <- data.frame(Freq=y_spec$Frequency, 
-                        y=y_spec1_r, 
+                        y=y_spec$SpectralDensity, 
                         y_wa=y_wa_r,
                         y_snr=y_spec2_r,
                         y_snr_freq=y_spec3_r) %>% 
@@ -450,7 +465,7 @@ summary(df_y_spec)
 df_y_spec$Group <- factor(df_y_spec$Group, levels = c("y","y_wa", "y_snr", "y_snr_freq"))
 
 
-fig3 <- ggplot(df_y_spec) +
+p2.2 <- ggplot(df_y_spec) +
 
   geom_line(aes(Freq, Spec, color=Group),linewidth=1) +
 
@@ -473,19 +488,19 @@ fig3 <- ggplot(df_y_spec) +
         strip.placement = "outside",
 
         legend.position = c(0.8,0.8),
-        legend.key.spacing.y = unit(0.1, 'cm'), 
+        legend.key.spacing.y = unit(0, 'cm'), 
         legend.background = element_rect(fill="transparent"),
         #legend.position = "right",
         legend.title=element_blank(),
         legend.key.width = unit(1,"cm"))
 
-fig3
+p2.2
 
 ```
 
 ## Metric comparison
 
-```{r}
+```{r met}
 # MSE 
 summary(y_wa_ls)
 
@@ -494,39 +509,89 @@ MSE_snr <- sapply(1:n_ensemble, function(i) mean((y_snr_ls[,i]-df_mat[[i]]$y)^2)
 MSE_snr_freq <- sapply(1:n_ensemble, function(i) mean((y_snr_freq_ls[,i]-df_mat[[i]]$y)^2))
 
 # Correlation
-R_wa <- sapply(1:n_ensemble, function(i) cor(y_wa_ls[,i],df_mat[[i]]$y))
-R_snr <- sapply(1:n_ensemble, function(i) cor(y_snr_ls[,i],df_mat[[i]]$y))
-R_snr_freq <- sapply(1:n_ensemble, function(i) cor(y_snr_freq_ls[,i],df_mat[[i]]$y))
+R_wa <- sapply(1:n_ensemble, function(i) cor(y_wa_ls[,i],df_mat[[i]]$y)^2)
+R_snr <- sapply(1:n_ensemble, function(i) cor(y_snr_ls[,i],df_mat[[i]]$y)^2)
+R_snr_freq <- sapply(1:n_ensemble, function(i) cor(y_snr_freq_ls[,i],df_mat[[i]]$y)^2)
 
 df_metric <- cbind(Group="MSE", data.frame(X1=MSE_wa, X2=MSE_snr, X3=MSE_snr_freq)) %>% 
-  rbind(cbind(Group="Correlation",data.frame(X1=R_wa, X2=R_snr, X3=R_snr_freq))) %>% 
+  rbind(cbind(Group="R2",data.frame(X1=R_wa, X2=R_snr, X3=R_snr_freq))) %>% 
   gather(Model, value, 2:4)
 
+df_metric$Model <- factor(df_metric$Model, labels=expression(WA,SNR,SNR(w)))
 summary(df_metric)
 
-p2 <- ggplot(df_metric, aes(x=Model, y=value, fill=Model)) + 
-    geom_boxplot() +
-    facet_wrap(~Group, scale="free")
+p2.3 <- ggplot(df_metric %>% subset(Group=="R2"), aes(x=Model, y=value, fill=Model)) + 
+  
+    geom_boxplot(outliers = F) +
+      stat_summary(fun=mean, geom="point", position=position_dodge(0.75), 
+               shape=24, size=1, color="red") +
+  
+    labs(y=expression(R^2), x=NULL) + 
+    scale_y_continuous(limits = c(0,1.25)) + 
+  
+    theme_bw() +
+    theme(text = element_text(size = 16, family="serif", face="bold"),
+          plot.margin = unit(c(0.5,0.5,0.1, 0.5), "cm"),
+          panel.grid.minor = element_blank(),
+          panel.grid.major = element_blank(),
+  
+          #axis.text.x = element_text(angle = 45, vjust=1, hjust=1),
+  
+           legend.position = c(0.8,0.8),
+          legend.key.spacing.y = unit(0.1, 'cm'), 
+          legend.background = element_rect(fill="transparent"),
+          #legend.position = "right",
+          legend.title=element_blank(),
+          legend.key.width = unit(1,"cm"))
 
 
-p2
+p2.3
+
+
+p2.4 <- ggplot(df_metric %>% subset(Group=="MSE"), aes(x=Model, y=value, fill=Model)) + 
+  
+    geom_boxplot(outliers = F) +
+    stat_summary(fun=mean, geom="point", position=position_dodge(0.75), 
+               shape=24, size=1, color="red") +
+  
+    labs(y=expression(MSE), x=NULL) + 
+    scale_y_continuous(limits = c(0,1.2)) + 
+    #scale_fill_manual(values=viridis(3)) + 
+  
+    theme_bw() +
+    theme(text = element_text(size = 16, family="serif", face="bold"),
+          plot.margin = unit(c(0.5,0.5,0.1, 0.5), "cm"),
+          panel.grid.minor = element_blank(),
+          panel.grid.major = element_blank(),
+  
+          #axis.text.x = element_text(angle = 45, vjust=1, hjust=1),
+  
+          legend.position = c(0.8,0.8),
+          legend.key.spacing.y = unit(0.1, 'cm'), 
+          legend.background = element_rect(fill="transparent"),
+          #legend.position = "right",
+          legend.title=element_blank(),
+          legend.key.width = unit(1,"cm"))
+
+
+p2.4
+
 ```
 
 
-# Figure 2
+## Figure 2
 ```{r plt2}
 
-plt2 <- cowplot::plot_grid(fig2,fig3, ncol=2, labels=LETTERS, 
+plt2 <- cowplot::plot_grid(p2.1,p2.2, p2.3, p2.4, ncol=2, labels=LETTERS, 
 						               label_size=12,
                            label_fontfamily = "serif",
                            label_fontface = "bold",
                            label_colour = "black")
 
-
 plt2
 
 ## save plot 
-ggsave(paste0("Figure2.jpg"), plt2, width = 9, height = 5,  dpi=500)
+ggsave(paste0("Figure2_",model,"_",flag.mode,"_scaleF.jpg"), plt2, width = 9, height = 9,  dpi=500)
 ```
 
 
