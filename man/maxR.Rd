@@ -7,7 +7,12 @@
 maxR(a, ExxT)
 }
 \arguments{
-\item{ExxT}{}
+\item{a}{scaling factor}
+
+\item{ExxT}{ExxT}
+}
+\value{
+A vector of weights.
 }
 \description{
 maxR

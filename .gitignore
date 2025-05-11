@@ -1,7 +1,6 @@
 # History files
 .Rhistory
 .Rapp.history
-*.jpg
 
 # Session Data files
 .RData
@@ -49,3 +48,6 @@ po/*~
 # RStudio Connect folder
 rsconnect/
 inst/doc
+data-raw/
+/doc/
+/Meta/

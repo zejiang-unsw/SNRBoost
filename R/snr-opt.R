@@ -1,14 +1,13 @@
 #' Data Generation
 #'
-#' @param n
-#' @param p
-#' @param ecc
-#' @param SNRdB
+#' @param n sample size
+#' @param p number of variable
+#' @param ecc error covariance
+#' @param SNRdB SNR in dB
 #'
-#' @return
+#' @return A list of y and error
 #' @export
 #'
-#' @examples
 dataGEN <- function(n, p, ecc, SNRdB, model) {
   # dataGEN function
   # This function is to generate orthogonal y and e
@@ -71,13 +70,12 @@ dataGEN <- function(n, p, ecc, SNRdB, model) {
 
 #' WA_est
 #'
-#' @param y
-#' @param x
+#' @param y observation
+#' @param x parent products
 #'
-#' @return
+#' @return A list of weight and merged product.
 #' @export
 #'
-#' @examples
 WA_est <- function(y=NULL,x){
 
   ExxT <- cov(x)
@@ -96,13 +94,12 @@ WA_est <- function(y=NULL,x){
 
 #' SNRopt_est
 #'
-#' @param y
-#' @param x
+#' @param y observations
+#' @param x parent products
 #'
-#' @return
+#' @return A list of weight and merged product.
 #' @export
 #'
-#' @examples
 SNRopt_est <- function(y, x){
 
   ExxT <- cov(x)
@@ -126,12 +123,11 @@ SNRopt_est <- function(y, x){
 
 #' Weighted Average function
 #'
-#' @param EeeT
+#' @param EeeT EeeT
 #'
-#' @return
+#' @return A vector of weights.
 #' @export
 #'
-#' @examples
 WA <- function(EeeT) {
   # WA function
   # This function is to estimate weight for Weighted Average
@@ -150,13 +146,12 @@ WA <- function(EeeT) {
 
 #' SNR optimization
 #'
-#' @param N
-#' @param a
+#' @param N Noise-to-signal ratio matrix
+#' @param a scaling factor
 #'
-#' @return
+#' @return A vector of weights.
 #' @export
 #'
-#' @examples
 SNRopt <- function(N, a) {
   # SNRopt function
   # This function is to estimate weight for SNRopt
@@ -178,14 +173,14 @@ SNRopt <- function(N, a) {
 
 #' maxR
 #'
-#' @param a
-#' @param ExxT
+#' @param a scaling factor
+#' @param ExxT ExxT
 #'
-#' @return
+#' @return A vector of weights.
 #' @export
+#'
 #' @import geigen
 #'
-#' @examples
 maxR <- function(a, ExxT) {
   # maxR function
   # This function is to estimate weight for maximizing Pearson R

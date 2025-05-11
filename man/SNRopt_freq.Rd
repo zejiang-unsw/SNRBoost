@@ -13,11 +13,25 @@ SNRopt_freq(
   pad = "zero",
   boundary = "periodic",
   theta = 0.1,
-  option = "Est"
+  option = "Est",
+  scale_factor = T
 )
 }
 \arguments{
-\item{theta}{}
+\item{x}{parent products}
+
+\item{mode}{wavelet decomposition mode}
+
+\item{wf}{wavelet filter}
+
+\item{J}{max level of decomposition level}
+
+\item{boundary}{boundary condition of wavelet transform}
+
+\item{theta}{factor for Ey2 estimation}
+}
+\value{
+A list of weight, merged products.
 }
 \description{
 SNRopt_freq

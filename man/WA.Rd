@@ -7,7 +7,10 @@
 WA(EeeT)
 }
 \arguments{
-\item{EeeT}{}
+\item{EeeT}{EeeT}
+}
+\value{
+A vector of weights.
 }
 \description{
 Weighted Average function

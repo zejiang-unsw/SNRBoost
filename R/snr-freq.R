@@ -1,19 +1,19 @@
 #' SNRopt_freq
 #'
-#' @param x
-#' @param mode
-#' @param wf
-#' @param J
-#' @param boundary
-#' @param theta
+#' @param x parent products
+#' @param mode wavelet decomposition mode
+#' @param wf wavelet filter
+#' @param J max level of decomposition level
+#' @param boundary boundary condition of wavelet transform
+#' @param theta factor for Ey2 estimation
 #'
-#' @return
+#' @return A list of weight, merged products.
 #' @export
+#'
 #' @import waveslim
 #' @import WASP
 #' @import readr
 #'
-#' @examples
 SNRopt_freq <- function(y=NULL, x, mode="DWT", wf="haar", J, pad="zero", boundary="periodic", theta=0.1,
                         option="Est", scale_factor=T) {
 
@@ -69,14 +69,13 @@ SNRopt_freq <- function(y=NULL, x, mode="DWT", wf="haar", J, pad="zero", boundar
       a_WT <- sapply(1:p, function(i) cor(y_WT[, i_lev], x_WT[,i])*sd(y_WT[, i_lev])/sd(x_WT[,i]))
 
     } else if(option=="Est") {
-      #Ey2_wT = var(rowMeans(x_WT))*theta
-      #Ey2_wT = max(apply(x_WT, 2, var))*theta
-      Ey2_wT = max(colMeans(x_WT^2))*theta
-      Ey2_WT <- mean(y_WT[, i_lev]^2) # best estimate from observation
+      Ey2_WT = var(rowMeans(x_WT))*theta
+      #Ey2_WT = max(apply(x_WT, 2, var))*theta
+      #Ey2_WT = max(colMeans(x_WT^2))*theta
 
       ExxT_WT = cov(x_WT)
 
-      SNRest_WT <- SNRest(ExxT_WT, Ey2_wT)
+      SNRest_WT <- SNRest(ExxT_WT, Ey2_WT)
 
       N_WT <- SNRest_WT$N_est
       if(scale_factor) {
@@ -104,17 +103,14 @@ SNRopt_freq <- function(y=NULL, x, mode="DWT", wf="haar", J, pad="zero", boundar
 
 }
 
-
-
 #' snr
 #'
-#' @param signal
-#' @param noise
+#' @param signal signal
+#' @param noise noise
 #'
-#' @return
+#' @return SNR in dB
 #' @export
 #'
-#' @examples
 snr <- function(signal, noise) {
   # # Define a function to calculate SNR in dB
 

@@ -7,7 +7,12 @@
 SNRopt(N, a)
 }
 \arguments{
-\item{a}{}
+\item{N}{Noise-to-signal ratio matrix}
+
+\item{a}{scaling factor}
+}
+\value{
+A vector of weights.
 }
 \description{
 SNR optimization

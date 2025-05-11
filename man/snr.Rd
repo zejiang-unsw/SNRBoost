@@ -7,7 +7,12 @@
 snr(signal, noise)
 }
 \arguments{
-\item{noise}{}
+\item{signal}{signal}
+
+\item{noise}{noise}
+}
+\value{
+SNR in dB
 }
 \description{
 snr
