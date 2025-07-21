@@ -8,11 +8,12 @@ SNRopt_freq(
   y = NULL,
   x,
   mode = "DWT",
+  method = "modwt",
   wf = "haar",
   J,
   pad = "zero",
   boundary = "periodic",
-  theta = 0.1,
+  theta = 1,
   option = "Est",
   scale_factor = T
 )

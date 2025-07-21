@@ -14,8 +14,8 @@
 #' @import WASP
 #' @import readr
 #'
-SNRopt_freq <- function(y=NULL, x, mode="DWT", wf="haar", J, pad="zero", boundary="periodic", theta=0.1,
-                        option="Est", scale_factor=T) {
+SNRopt_freq <- function(y=NULL, x, mode="DWT", method="modwt", wf="haar", J, pad="zero", boundary="periodic",
+                        theta=1, option="Est", scale_factor=T) {
 
   n <- nrow(x)
   p <- ncol(x)
@@ -29,7 +29,7 @@ SNRopt_freq <- function(y=NULL, x, mode="DWT", wf="haar", J, pad="zero", boundar
 
     if(mode=="DWT"){
       x1 <- padding(x[,i_x], pad = pad)
-      tmp <- mra(x1, wf=wf, J=J, method="modwt", boundary=boundary)
+      tmp <- mra(x1, wf=wf, J=J, method=method, boundary=boundary)
       x_WTs[,i_x, ] <- matrix(unlist(lapply(tmp, function(z) z[1:n])), ncol = J + 1, byrow = FALSE)
     } else if(mode=="MODWT"){
       tmp <- modwt(x[,i_x], wf=wf, n.levels = J, boundary = boundary)
@@ -39,16 +39,17 @@ SNRopt_freq <- function(y=NULL, x, mode="DWT", wf="haar", J, pad="zero", boundar
 
   }
 
-  if(mode=="DWT"){
-    y1 <- padding(y, pad = pad)
-    tmp <- mra(y1, wf=wf, J=J, method="modwt", boundary=boundary)
-    y_WT <- matrix(unlist(lapply(tmp, function(z) z[1:n])), ncol = J + 1, byrow = FALSE)
-  } else if(mode=="MODWT"){
-    tmp <- modwt(y, wf=wf, n.levels = J, boundary = boundary)
-    #summary(tmp) %>% print()
-    y_WT <- matrix(unlist(tmp), ncol = J + 1, byrow = FALSE)
+  if(option=="Truth"){
+    if(mode=="DWT"){
+      y1 <- padding(y, pad = pad)
+      tmp <- mra(y1, wf=wf, J=J, method=method, boundary=boundary)
+      y_WT <- matrix(unlist(lapply(tmp, function(z) z[1:n])), ncol = J + 1, byrow = FALSE)
+    } else if(mode=="MODWT"){
+      tmp <- modwt(y, wf=wf, n.levels = J, boundary = boundary)
+      #summary(tmp) %>% print()
+      y_WT <- matrix(unlist(tmp), ncol = J + 1, byrow = FALSE)
+    }
   }
-
 
   # weight estimation
   u_est_WT <- matrix(nrow=J+1, ncol=p)
@@ -66,7 +67,8 @@ SNRopt_freq <- function(y=NULL, x, mode="DWT", wf="haar", J, pad="zero", boundar
       EeeT_WT <- cov(e_WT)
       N_WT <- EeeT_WT / Ey2_WT  # error-to-signal ratio
       #a_WT <- cor(y_WT[, i_lev], x_WT)  # truth
-      a_WT <- sapply(1:p, function(i) cor(y_WT[, i_lev], x_WT[,i])*sd(y_WT[, i_lev])/sd(x_WT[,i]))
+      a_WT <- solve(t(x_WT) %*% x_WT) %*% t(x_WT) %*% y_WT[, i_lev]
+      #a_WT <- sapply(1:p, function(i) cor(y_WT[, i_lev], x_WT[,i])*sd(y_WT[, i_lev])/sd(x_WT[,i]))
 
     } else if(option=="Est") {
       Ey2_WT = var(rowMeans(x_WT))*theta
@@ -96,6 +98,10 @@ SNRopt_freq <- function(y=NULL, x, mode="DWT", wf="haar", J, pad="zero", boundar
 
   y_est <- rowSums(y_est_WT)
 
+  std_y <- sd(rowMeans(x))
+  mu_y <- mean(x)
+  y_est <- y_est/sd(y_est)*std_y + mu_y
+
   out <- list(weight=u_est_WT,
               merged_WT=y_est_WT,
               merged=y_est)
@@ -112,7 +118,7 @@ SNRopt_freq <- function(y=NULL, x, mode="DWT", wf="haar", J, pad="zero", boundar
 #' @export
 #'
 snr <- function(signal, noise) {
-  # # Define a function to calculate SNR in dB
+  # Define a function to calculate SNR in dB
 
   power_signal <- sum(signal^2) / length(signal)
   power_noise <- sum(noise^2) / length(noise)
