@@ -32,9 +32,8 @@ p <- 3 # number of datasets
 n <- 1000 # data length
 eta <- matrix(rep(1, p), ncol = 1)
 
-######## scaling factor (a)##########
+# scaling factor (a)
 a <- matrix(runif(p), ncol=1) # non-1-vector (for test)
-######################################
 
 ecc <- 0.3 # error cross-correlation [0,1]
 SNRdB <- 0.1 # SNR in dB
@@ -50,8 +49,7 @@ y <- matrix(y, ncol=1)
 x <- y %*% t(a) + e
 
 # Signal power and covariance matrices of e and x
-Ey2 <- var(y)
-Ey2 <- Ey2[1]
+Ey2 <- var(y[,1])
 EeeT <- cov(e)
 ExxT <- cov(x)
 N <- EeeT / Ey2 # error-to-signal ratio
@@ -146,7 +144,8 @@ R2_results <- rbind(matrix(mean(R2_ori), nrow=1, ncol=4), t(R2_true), t(R2_est))
 
 colors <- c("red", "green", "blue")
 
-par(mfrow = c(1, 2))
+# plot ----
+par(mfrow = c(1, 2), xpd=NA)
 
 colnames(MSE_results) <- c("WA", "SNR", "maxR", "EW")
 rownames(MSE_results) <- c("Ori","True prm","Est prm")
@@ -156,5 +155,9 @@ title(main = "MSE", xlab = "Methods", ylab = "MSE")
 colnames(R2_results) <- c("WA", "SNR", "maxR", "EW")
 rownames(R2_results) <- c("Ori","True prm","Est prm")
 barplot(R2_results, beside = TRUE, names.arg = rownames(data), col = colors, legend.text = colnames(data))
-legend("bottomleft", legend = rownames(R2_results), fill = colors, inset = c(0, 0.15), ncol = 1)
 title(main = "R2", xlab = "Methods", ylab = "R2")
+
+# Add a common legend at top center
+legend(x = -8, y = 0.4,            # adjust x to shift left
+       legend = rownames(MSE_results),
+       fill = colors, horiz = F, bty = "n", xpd = NA)
